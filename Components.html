@@ -1,0 +1,122 @@
+<html>
+
+<head>
+<title>P5-10 Components</title>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<style>
+a {
+    color: #6d6d6d;
+}
+.glyphicon {
+    top: 3px;
+}
+.wire {
+    color: #cc00ff;
+    font-family:consolas;
+    font-weight: bold;
+    white-space: nowrap;
+}
+.selected-wire {
+    color:red;
+    font-weight:bold;
+    font-family:consolas;
+    white-space: nowrap;
+}
+</style>
+</head>
+
+<body>
+
+</body>
+
+<script id="component-template" type="text">
+<table class="table table-striped">
+{{#.}}
+    <tr style="background-color: #46468e;color: white">
+        <td colspan="3">{{#if id}}{{id}}{{/if}}{{#if name}} {{name}}{{/if}}{{#if part}} ({{part}}){{/if}}</td>
+    </tr>
+    {{#pins}}
+        <tr id="{{id}}">
+            <td style="padding-left: 60px; min-width: 20px;vertical-align:middle;">{{pin}}</td>
+        {{#if name}}
+            <td colspan="{{componentColumns ..}}">{{name}}</td>
+            {{#if wires}}
+            </tr><tr><td></td>
+            {{/if}}
+        {{/if}}
+        {{#if wires}} 
+            <td style="vertical-align:middle;" colspan="{{componentColumns ..}}">{{#traceWires}}{{#left}}<a href="#{{pin.id}}">{{pin.pin}}: {{#if component.id}}{{component.id}} {{/if}}{{component.name}}{{#if pin.name}} {{pin.name}}{{/if}}</a> <span class="wire"><----{{wire}}----></span> {{/left}} <span class="selected-wire"><span class="glyphicon glyphicon-record"></span></span> {{#right}} <span class="wire"><----{{wire}}----></span> <a href="#{{pin.id}}">{{pin.pin}}: {{#if component.id}}{{component.id}} {{/if}}{{component.name}} {{#if pin.name}} {{pin.name}}{{/if}}</a>{{/right}}{{/traceWires}}</td>
+        {{/if}}
+        {{#if @first}}
+            {{#if ../image}}
+            <td style="vertical-align:middle;text-align: center;padding: 5px 50px" rowspan="{{componentRows ..}}">
+                <img src="Components/{{../image}}"/>
+            </td>
+            {{/if}}
+        {{/if}}
+        </tr>
+    {{/pins}}
+{{/.}}
+</table>
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.3/lodash.min.js"></script>
+<script
+  src="https://code.jquery.com/jquery-3.1.1.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="Components.js"></script>
+
+<script>
+
+Array.prototype.selectMany = function (fn) {
+    return this.map(fn).reduce(function (x, y) { return x.concat(y); }, []);
+};
+
+$(x => {
+    var ids = 0;
+    components.forEach(c => c.pins.forEach(p => p.id = ids++));
+    var connections = _.flattenDeep(components.map(c =>
+        c.pins.filter(p => p.wires).map(p => 
+            p.wires.map(w => ({
+                id: ids++,
+                wire: w,
+                pin: p,
+                component: c
+            })))));
+
+    var traceWires = connection => {
+      var wires = [];
+      var current = connections.filter(x => x.wire == connection.wire && x.id != connection.id)[0];
+      do {
+          wires.push(current);
+          var nextWire = current.pin.wires.filter(x => x != current.wire)[0];
+          current = connections.filter(x => x.wire == nextWire && x.pin.id != current.pin.id)[0];
+      }
+      while (current); 
+      return wires;        
+    };
+
+    Handlebars.registerHelper('componentColumns', function(component, options) {
+        return component.image ? 1 : 2;
+    });
+
+    Handlebars.registerHelper('componentRows', function(component, options) {
+        return component.pins.map(x => x.name && x.wires ? 2 : 1, 0)
+            .reduce((a, i) => a + i);
+    });
+
+    Handlebars.registerHelper('traceWires', function(options) {
+        var traces = _.sortBy(connections.filter(x => x.pin.id == this.id)
+            .map(x => traceWires(x)), x => x[x.length - 1].component.connector);
+        return options.fn({
+            left: traces.length == 2 ? traces[0].reverse() : null,
+            right: traces[traces.length - 1]
+        });
+    });
+
+    $('body').html(Handlebars.compile($('#component-template').html())(components));
+});
+
+</script>
+
+</html>
